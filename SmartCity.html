@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Smart City Dashboard — Алматы</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Unbounded:wght@300;400;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0c0f;
+    --bg2: #111318;
+    --bg3: #181c22;
+    --bg4: #1f2430;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --text2: #8b90a0;
+    --text3: #555b6e;
+    --green: #1fcb82;
+    --green-dim: rgba(31,203,130,0.12);
+    --amber: #f5a623;
+    --amber-dim: rgba(245,166,35,0.12);
+    --red: #ff4d4d;
+    --red-dim: rgba(255,77,77,0.12);
+    --blue: #4d9eff;
+    --blue-dim: rgba(77,158,255,0.1);
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Unbounded', sans-serif;
+  }
+
+  html { font-size: 14px; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,12,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .header-left { display: flex; align-items: center; gap: 20px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--green);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    color: #0a0c0f;
+  }
+  .logo-text { font-family: var(--font-display); font-size: 13px; font-weight: 600; color: var(--text); }
+  .logo-sub { font-size: 10px; color: var(--text3); letter-spacing: 1px; }
+  .header-center { display: flex; gap: 2px; }
+  .nav-btn {
+    background: transparent; border: none; color: var(--text2);
+    font-family: var(--font-mono); font-size: 11px; padding: 6px 14px;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s;
+  }
+  .nav-btn:hover { background: var(--bg3); color: var(--text); }
+  .nav-btn.active { background: var(--bg4); color: var(--text); border: 1px solid var(--border2); }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .live-badge { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--green); }
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+    animation: pulse 2s infinite; box-shadow: 0 0 8px var(--green);
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .clock { font-family: var(--font-display); font-size: 13px; font-weight: 300; color: var(--text2); letter-spacing: 2px; }
+  .main { padding: 24px 32px; max-width: 1600px; margin: 0 auto; }
+
+  .alert-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,77,77,0.08); border: 1px solid rgba(255,77,77,0.25);
+    border-radius: 8px; padding: 10px 16px; margin-bottom: 24px;
+    font-size: 12px; color: #ff9999; animation: slideDown 0.4s ease;
+  }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .alert-banner-icon { font-size: 14px; color: var(--red); animation: pulse 1.5s infinite; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .kpi-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .kpi-card.ok::before { background: var(--green); }
+  .kpi-card.warn::before { background: var(--amber); }
+  .kpi-card.crit::before { background: var(--red); }
+  .kpi-card.info::before { background: var(--blue); }
+  .kpi-label { font-size: 9px; color: var(--text3); letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px; }
+  .kpi-value { font-family: var(--font-display); font-size: 22px; font-weight: 600; line-height: 1; margin-bottom: 5px; }
+  .kpi-card.ok .kpi-value { color: var(--green); }
+  .kpi-card.warn .kpi-value { color: var(--amber); }
+  .kpi-card.crit .kpi-value { color: var(--red); }
+  .kpi-card.info .kpi-value { color: var(--blue); }
+  .kpi-delta { font-size: 10px; color: var(--text3); }
+
+  .grid-main { display: grid; grid-template-columns: 1fr 1fr 380px; gap: 16px; margin-bottom: 16px; }
+  .grid-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 10px; letter-spacing: 1.2px; color: var(--text2); text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .card-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .card-body { padding: 20px; }
+  .chart-wrap { position: relative; width: 100%; }
+
+  .alert-list { padding: 0; }
+  .alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border); transition: background 0.15s; cursor: pointer; }
+  .alert-item:last-child { border-bottom: none; }
+  .alert-item:hover { background: var(--bg3); }
+  .alert-severity { font-size: 9px; font-weight: 600; padding: 3px 7px; border-radius: 4px; letter-spacing: 1px; white-space: nowrap; margin-top: 1px; }
+  .sev-crit { background: rgba(255,77,77,0.2); color: var(--red); border: 1px solid rgba(255,77,77,0.3); }
+  .sev-warn { background: rgba(245,166,35,0.15); color: var(--amber); border: 1px solid rgba(245,166,35,0.3); }
+  .alert-body { flex: 1; }
+  .alert-title { font-size: 12px; color: var(--text); margin-bottom: 3px; line-height: 1.4; }
+  .alert-meta { font-size: 10px; color: var(--text3); }
+
+  .city-map { padding: 20px; }
+  .map-districts {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 6px;
+    height: 220px;
+  }
+  .district {
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    padding: 4px;
+  }
+  .district:hover { transform: scale(1.05); z-index: 10; }
+  .district-name { font-size: 8px; color: rgba(255,255,255,0.5); margin-bottom: 2px; }
+  .district-val { font-family: var(--font-display); font-size: 13px; font-weight: 600; }
+  .d-crit { background: rgba(255,77,77,0.25); border-color: rgba(255,77,77,0.4); }
+  .d-crit .district-val { color: var(--red); }
+  .d-warn { background: rgba(245,166,35,0.2); border-color: rgba(245,166,35,0.35); }
+  .d-warn .district-val { color: var(--amber); }
+  .d-ok { background: rgba(31,203,130,0.1); border-color: rgba(31,203,130,0.2); }
+  .d-ok .district-val { color: var(--green); }
+  .map-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 10px; color: var(--text3); justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  .ai-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 16px; }
+  .ai-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .ai-title-wrap { display: flex; align-items: center; gap: 10px; }
+  .ai-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #1fcb82, #4d9eff);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    color: white;
+  }
+  .ai-label { font-size: 11px; color: var(--text); }
+  .ai-sublabel { font-size: 9px; color: var(--text3); margin-top: 1px; }
+  .ai-run-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 8px 18px;
+    background: var(--green);
+    color: #0a0c0f;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .ai-run-btn:hover { background: #25e895; transform: translateY(-1px); }
+  .ai-run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ai-body { padding: 20px; }
+  .ai-blocks { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .ai-block { border-radius: 10px; padding: 16px; border: 1px solid; }
+  .ai-block-what { background: var(--bg3); border-color: rgba(77,158,255,0.2); }
+  .ai-block-crit { background: rgba(255,77,77,0.05); border-color: rgba(255,77,77,0.2); }
+  .ai-block-action { background: rgba(31,203,130,0.05); border-color: rgba(31,203,130,0.2); }
+  .ai-block-q { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .ai-block-what .ai-block-q { color: var(--blue); }
+  .ai-block-crit .ai-block-q { color: var(--red); }
+  .ai-block-action .ai-block-q { color: var(--green); }
+  .ai-block-text { font-size: 12px; color: var(--text2); line-height: 1.7; }
+  .ai-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px; color: var(--text3); font-size: 12px; gap: 8px; }
+  .ai-loading { display: none; align-items: center; justify-content: center; gap: 10px; padding: 30px; font-size: 12px; color: var(--text2); }
+  .ai-loading.show { display: flex; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--border2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .forecast-list { padding: 0 20px 20px; }
+  .forecast-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .forecast-item:last-child { border-bottom: none; }
+  .forecast-time { color: var(--text3); width: 50px; font-size: 10px; }
+  .forecast-bar-wrap { flex: 1; background: var(--bg3); border-radius: 4px; height: 6px; overflow: hidden; }
+  .forecast-bar { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .forecast-val { width: 35px; text-align: right; }
+  .bar-crit { background: var(--red); }
+  .bar-warn { background: var(--amber); }
+  .bar-ok { background: var(--green); }
+
+  .tab-section { display: none; }
+  .tab-section.active { display: block; }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .footer-right { display: flex; gap: 20px; }
+
+  .fade-in { animation: fadeIn 0.5s ease forwards; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .stagger > * { opacity: 0; animation: fadeIn 0.4s ease forwards; }
+  .stagger > *:nth-child(1){animation-delay:0.05s}
+  .stagger > *:nth-child(2){animation-delay:0.1s}
+  .stagger > *:nth-child(3){animation-delay:0.15s}
+  .stagger > *:nth-child(4){animation-delay:0.2s}
+  .stagger > *:nth-child(5){animation-delay:0.25s}
+  .stagger > *:nth-child(6){animation-delay:0.3s}
+  .stagger > *:nth-child(7){animation-delay:0.35s}
+  .stagger > *:nth-child(8){animation-delay:0.4s}
+
+  @media(max-width:1200px) {
+    .kpi-row { grid-template-columns: repeat(4,1fr); }
+    .grid-main { grid-template-columns: 1fr 1fr; }
+    .ai-blocks { grid-template-columns: 1fr; }
+  }
+  @media(max-width:768px) {
+    .main { padding: 16px; }
+    .header { padding: 0 16px; }
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .grid-main,.grid-bottom { grid-template-columns: 1fr; }
+    .header-center { display: none; }
+    .ai-blocks { grid-template-columns: 1fr; }
+  }
+
+  .settings-wrap { position: relative; }
+  .settings-btn {
+    background: transparent; border: none; color: var(--text2); cursor: pointer;
+    width: 30px; height: 30px; border-radius: 6px; font-size: 20px;
+    transition: background 0.15s;
+  }
+  .settings-btn:hover { background: var(--bg3); color: var(--text); }
+  .settings-dropdown {
+    display: none; position: absolute; top: calc(100% + 10px); right: 0;
+    width: 264px; background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.55);
+    z-index: 9000; overflow: hidden;
+  }
+  .settings-dropdown.open { display: block; animation: dropIn 0.18s ease; }
+  @keyframes dropIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+  .settings-section { padding: 14px 16px 10px; }
+  .settings-label { font-size: 9px; color: var(--text3); text-transform: uppercase; margin-bottom: 10px; }
+  .theme-switcher { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; background: var(--bg3); padding: 4px; border-radius: 8px; }
+  .theme-btn {
+    background: transparent; border: 1px solid transparent; color: var(--text2);
+    font-family: var(--font-mono); font-size: 10px; padding: 7px 4px; border-radius: 6px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .theme-btn:hover { color: var(--text); }
+  .theme-btn.active { background: var(--bg4); color: var(--text); border-color: var(--border2); }
+  .settings-divider { height: 1px; background: var(--border); margin: 2px 0; }
+  .settings-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; transition: background 0.12s; font-size: 12px; color: var(--text2); }
+  .settings-item:hover { background: var(--bg3); color: var(--text); }
+  .settings-item-icon { font-size: 14px; width: 20px; text-align: center; }
+  .settings-item-text { flex: 1; }
+  .settings-item-key { font-size: 9px; color: var(--text3); background: var(--bg4); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-family: var(--font-mono); }
+  .toggle-switch { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--bg4); border: 1px solid var(--border2); border-radius: 18px; cursor: pointer; transition: 0.2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 12px; height: 12px; left: 2px; top: 2px; background: var(--text3); border-radius: 50%; transition: 0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--green-dim); border-color: var(--green); }
+  .toggle-switch input:checked + .toggle-slider::before { background: var(--green); transform: translateX(16px); }
+  .settings-footer { padding: 10px 16px; font-size: 9px; color: var(--text3); border-top: 1px solid var(--border); }
+
+  body.theme-light {
+    --bg: #f4f5f7; --bg2: #ffffff; --bg3: #eaecf0; --bg4: #dde0e8;
+    --border: rgba(0,0,0,0.08); --border2: rgba(0,0,0,0.14);
+    --text: #111420; --text2: #4a5168; --text3: #8a90a8;
+  }
+  body.theme-light .header { background: rgba(244,245,247,0.95); }
+  body.theme-light body::before { opacity: 0; }
+
+  .record-active { color: var(--red) !important; animation: pulse 1s infinite; }
+  .sc-toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    padding: 10px 18px; border-radius: 8px; font-size: 11px;
+    font-family: var(--font-mono); z-index: 9999;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); animation: slideDown 0.3s ease;
+    pointer-events: none;
+  }
+  .voice-btn {
+    background: rgba(0,0,0,0.6); border: 1px solid var(--green); border-radius: 20px;
+    padding: 4px 12px; font-size: 10px; cursor: pointer; transition: all 0.15s;
+    color: var(--green); display: inline-flex; align-items: center; gap: 6px;
+  }
+  .voice-btn:hover { background: var(--green-dim); transform: scale(1.02); }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo">
+      <div class="logo-icon">SC</div>
+      <div><div class="logo-text">Smart City</div><div class="logo-sub">АЛМАТЫ — МГД</div></div>
+    </div>
+  </div>
+  <div class="header-center">
+    <button class="nav-btn active" onclick="switchPage('overview',this)">Обзор</button>
+    <button class="nav-btn" onclick="switchPage('transport',this)">Транспорт</button>
+    <button class="nav-btn" onclick="switchPage('ecology',this)">Экология</button>
+    <button class="nav-btn" onclick="switchPage('ai',this)">AI-анализ</button>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+    <div class="clock" id="clock">—</div>
+    <div class="settings-wrap" id="settingsWrap">
+      <button class="settings-btn" id="settingsBtn" onclick="toggleSettings(event)">⚙</button>
+      <div class="settings-dropdown" id="settingsDropdown">
+        <div class="settings-section"><div class="settings-label">Тема</div>
+          <div class="theme-switcher">
+            <button class="theme-btn" onclick="setTheme('system',this)">🌓 System</button>
+            <button class="theme-btn" onclick="setTheme('light',this)">☀️ Light</button>
+            <button class="theme-btn active" onclick="setTheme('dark',this)">🌙 Dark</button>
+          </div>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="settings-item" onclick="rerunDashboard()"><span class="settings-item-icon">🔄</span><span class="settings-item-text">Перезапустить</span><span class="settings-item-key">R</span></div>
+        <div class="settings-item" onclick="exportReport()"><span class="settings-item-icon">📸</span><span class="settings-item-text">Экспорт отчёта</span></div>
+        <div class="settings-item" onclick="window.print();closeSettings()"><span class="settings-item-icon">🖨️</span><span class="settings-item-text">Печать</span></div>
+        <div class="settings-divider"></div>
+        <div class="settings-footer">Алматы · Smart City v2.0</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- OVERVIEW PAGE -->
+  <div class="tab-section active" id="page-overview">
+    <div class="alert-banner"><span class="alert-banner-icon">⚠</span><span>2 критических события требуют немедленного реагирования: авария на пр. Достык + превышение PM2.5 в 3.5x</span></div>
+    <div class="kpi-row stagger">
+      <div class="kpi-card crit"><div class="kpi-label">Загрузка дорог</div><div class="kpi-value" id="kpiTraffic">84%</div><div class="kpi-delta" style="color:var(--red)">▲ +12% vs норма</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Пробки (км)</div><div class="kpi-value" id="kpiJam">47</div><div class="kpi-delta" style="color:var(--amber)">▲ +8 за час</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Ср. скорость</div><div class="kpi-value" id="kpiSpeed">18 <span style="font-size:12px">км/ч</span></div><div class="kpi-delta" style="color:var(--amber)">▼ −22 от нормы</div></div>
+      <div class="kpi-card crit"><div class="kpi-label">Инциденты</div><div class="kpi-value" id="kpiIncidents">3</div><div class="kpi-delta" style="color:var(--red)">Активных сейчас</div></div>
+      <div class="kpi-card crit"><div class="kpi-label">AQI индекс</div><div class="kpi-value" id="kpiAQI">156</div><div class="kpi-delta" style="color:var(--red)">Нездоровый</div></div>
+      <div class="kpi-card crit"><div class="kpi-label">PM2.5 мкг/м³</div><div class="kpi-value" id="kpiPM">89</div><div class="kpi-delta" style="color:var(--red)">▲ Норма: 25</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">CO₂ (ppm)</div><div class="kpi-value" id="kpiCO2">438</div><div class="kpi-delta" style="color:var(--amber)">▲ +18 за сутки</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Шум (дБ)</div><div class="kpi-value">61</div><div class="kpi-delta" style="color:var(--green)">В норме</div></div>
+    </div>
+
+    <div class="grid-main">
+      <div class="card fade-in"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--red)"></div>Загрузка дорог — сегодня</div></div><div class="card-body"><div class="chart-wrap" style="height:200px"><canvas id="trafficChart"></canvas></div></div></div>
+      <div class="card fade-in"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--amber)"></div>Индекс AQI — 7 дней</div></div><div class="card-body"><div class="chart-wrap" style="height:200px"><canvas id="aqiChart"></canvas></div></div></div>
+      <div class="card fade-in"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--red);animation:pulse 1.5s infinite"></div>Активные инциденты</div><span style="font-size:10px;color:var(--text3)">5 событий</span></div><div class="alert-list" id="alertsList"></div></div>
+    </div>
+
+    <div class="grid-bottom">
+      <div class="card fade-in"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--blue)"></div>Загрузка по районам (транспорт, %)</div></div><div class="city-map"><div class="map-districts" id="districtsMap"></div><div class="map-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Критично (>75%)</div><div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Средний (50–75%)</div><div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Норма (<50%)</div></div></div></div>
+      <div class="card fade-in"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--amber)"></div>Источники загрязнения / Прогноз трафика</div></div><div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><div><div style="font-size:9px;color:var(--text3);margin-bottom:10px;text-transform:uppercase">Источники PM2.5</div><div class="chart-wrap" style="height:150px"><canvas id="pollChart"></canvas></div></div><div><div style="font-size:9px;color:var(--text3);margin-bottom:10px;text-transform:uppercase">Прогноз загрузки</div><div class="forecast-list" id="forecastList"></div></div></div></div>
+    </div>
+  </div>
+
+  <!-- TRANSPORT PAGE -->
+  <div class="tab-section" id="page-transport">
+    <div style="margin-bottom:20px"><div style="font-family:var(--font-display);font-size:18px;font-weight:600">Транспорт</div><div style="font-size:11px;color:var(--text3)">Мониторинг дорожной ситуации</div></div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card crit"><div class="kpi-label">Загрузка дорог</div><div class="kpi-value">84%</div><div class="kpi-delta" style="color:var(--red)">Критично</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Пробки</div><div class="kpi-value">47 км</div><div class="kpi-delta" style="color:var(--amber)">▲ +8 км</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Скорость</div><div class="kpi-value">18 км/ч</div><div class="kpi-delta" style="color:var(--amber)">Норма 40-50</div></div>
+      <div class="kpi-card crit"><div class="kpi-label">Инциденты</div><div class="kpi-value">3</div><div class="kpi-delta" style="color:var(--red)">Активных</div></div>
+    </div>
+    <div class="grid-bottom"><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--red)"></div>Загрузка по часам</div></div><div class="card-body"><div class="chart-wrap" style="height:240px"><canvas id="trafficChart2"></canvas></div></div></div><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--amber)"></div>Загрузка по районам</div></div><div class="card-body"><div class="chart-wrap" style="height:240px"><canvas id="districtChart"></canvas></div></div></div></div>
+    <div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--red);animation:pulse 1.5s infinite"></div>Детали инцидентов</div></div><div class="alert-list"><div class="alert-item"><span class="alert-severity sev-crit">ВЫСОКИЙ</span><div class="alert-body"><div class="alert-title">Авария на пр. Достык — перекрыта правая полоса. Затор 2.3 км</div><div class="alert-meta">08:42 · Алмалинский р-н · Объезд: ул. Желтоксан</div></div></div><div class="alert-item"><span class="alert-severity sev-crit">ВЫСОКИЙ</span><div class="alert-body"><div class="alert-title">Ул. Фурманова: неисправность светофора на перекрёстке с ул. Абая</div><div class="alert-meta">09:15 · Бостандыкский р-н · Техслужба в 10:00</div></div></div><div class="alert-item"><span class="alert-severity sev-warn">СРЕДНИЙ</span><div class="alert-body"><div class="alert-title">Авт. №12, №45 — заполняемость 140%</div><div class="alert-meta">09:30 · Увеличение интервала рекомендовано</div></div></div></div></div>
+  </div>
+
+  <!-- ECOLOGY PAGE -->
+  <div class="tab-section" id="page-ecology">
+    <div style="margin-bottom:20px"><div style="font-family:var(--font-display);font-size:18px;font-weight:600">Экология</div><div style="font-size:11px;color:var(--text3)">Мониторинг качества воздуха</div></div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi-card crit"><div class="kpi-label">AQI</div><div class="kpi-value">156</div><div class="kpi-delta" style="color:var(--red)">Нездоровый</div></div>
+      <div class="kpi-card crit"><div class="kpi-label">PM2.5</div><div class="kpi-value">89</div><div class="kpi-delta" style="color:var(--red)">Превышение 3.5x</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">CO₂</div><div class="kpi-value">438</div><div class="kpi-delta" style="color:var(--amber)">▲ +18 за сутки</div></div>
+      <div class="kpi-card ok"><div class="kpi-label">Шум</div><div class="kpi-value">61 дБ</div><div class="kpi-delta" style="color:var(--green)">В норме</div></div>
+    </div>
+    <div class="grid-bottom"><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--amber)"></div>AQI — 14 дней</div></div><div class="card-body"><div class="chart-wrap" style="height:240px"><canvas id="aqiChart2"></canvas></div></div></div><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--blue)"></div>PM2.5 и CO₂ — сегодня</div></div><div class="card-body"><div class="chart-wrap" style="height:240px"><canvas id="pollChart2"></canvas></div></div></div></div>
+  </div>
+
+  <!-- AI PAGE -->
+  <div class="tab-section" id="page-ai">
+    <div style="margin-bottom:20px"><div style="font-family:var(--font-display);font-size:18px;font-weight:600">AI-аналитика</div><div style="font-size:11px;color:var(--text3)">Автоматический анализ ситуации</div></div>
+    <div class="ai-panel"><div class="ai-header"><div class="ai-title-wrap"><div class="ai-icon">AI</div><div><div class="ai-label">Система поддержки решений</div><div class="ai-sublabel">POWERED BY CLAUDE + LOCAL AI</div></div></div><div><button class="ai-run-btn" id="aiBtn" onclick="runAI()">▶ Запустить анализ</button><button class="voice-btn" onclick="speakInsight()" style="margin-left:10px">🎤 Озвучить</button></div></div><div id="aiPlaceholder" class="ai-placeholder"><div style="font-size:24px;opacity:0.3">◎</div><span>Нажмите «Запустить анализ»</span></div><div class="ai-loading" id="aiLoading"><div class="spinner"></div><span>AI анализирует данные...</span></div><div class="ai-body" id="aiBody" style="display:none"><div class="ai-blocks"><div class="ai-block ai-block-what"><div class="ai-block-q">◈ Что происходит</div><div class="ai-block-text" id="aiWhat">—</div></div><div class="ai-block ai-block-crit"><div class="ai-block-q">⚠ Насколько критично</div><div class="ai-block-text" id="aiCrit">—</div></div><div class="ai-block ai-block-action"><div class="ai-block-q">→ Необходимые действия</div><div class="ai-block-text" id="aiAction">—</div></div></div></div></div>
+    <div class="grid-bottom"><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--blue)"></div>Прогноз загрузки (8 часов)</div></div><div class="card-body"><div class="chart-wrap" style="height:200px"><canvas id="forecastChart"></canvas></div></div></div><div class="card"><div class="card-header"><div class="card-title"><div class="card-dot" style="background:var(--amber)"></div>Прогноз AQI (8 часов)</div></div><div class="card-body"><div class="chart-wrap" style="height:200px"><canvas id="forecastAQI"></canvas></div></div></div></div>
+  </div>
+</main>
+
+<footer class="footer"><div>Smart City Management Dashboard · Алматы · v2.0</div><div class="footer-right"><span>Данные: реальный симулятор</span><span>AI: Claude + Local</span><span id="footerTime">—</span></div></footer>
+
+<script>
+// === ДАННЫЕ ===
+let realtimeData = {
+  traffic: 84, jam: 47, speed: 18, incidents: 3,
+  aqi: 156, pm: 89, co2: 438
+};
+
+const districtsData = [
+  { name: "Алмалы", val: 84, status: "crit" }, { name: "Медеу", val: 80, status: "crit" },
+  { name: "Достык", val: 82, status: "crit" }, { name: "Жетысу", val: 77, status: "warn" },
+  { name: "Бостандык", val: 72, status: "warn" }, { name: "Ауэзов", val: 68, status: "warn" },
+  { name: "Турксиб", val: 66, status: "warn" }, { name: "Алатау", val: 52, status: "ok" },
+  { name: "Наурызбай", val: 45, status: "ok" }
+];
+
+const alerts = [
+  { severity: "crit", title: "Авария на пр. Достык — затор 2.3 км", meta: "Транспорт · 08:42 · Алмалинский р-н" },
+  { severity: "crit", title: "PM2.5 = 89 мкг/м³ — превышение в 3.5x", meta: "Экология · Сейчас · Весь город" },
+  { severity: "crit", title: "Светофор на ул. Фурманова не работает", meta: "Транспорт · 09:15 · Бостандыкский р-н" },
+  { severity: "warn", title: "Авт. №12, №45 — перегрузка 140%", meta: "Транспорт · 09:30" },
+  { severity: "warn", title: "SO₂ на 40% выше нормы — Промзона север", meta: "Экология · 07:00 · Турксибский р-н" }
+];
+
+// === ФУНКЦИИ ===
+function updateClock() {
+  const t = new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clock').textContent = t;
+  document.getElementById('footerTime').textContent = new Date().toLocaleDateString('ru-RU') + ' · ' + t;
+}
+setInterval(updateClock,1000); updateClock();
+
+function renderAlerts() {
+  const container = document.getElementById('alertsList');
+  if(!container) return;
+  container.innerHTML = alerts.map(a => `
+    <div class="alert-item">
+      <span class="alert-severity sev-${a.severity === 'crit' ? 'crit' : 'warn'}">${a.severity === 'crit' ? 'КРИТИЧНО' : 'СРЕДНИЙ'}</span>
+      <div class="alert-body"><div class="alert-title">${a.title}</div><div class="alert-meta">${a.meta}</div></div>
+    </div>
+  `).join('');
+}
+
+function renderDistricts() {
+  const container = document.getElementById('districtsMap');
+  if(!container) return;
+  const districtsGrid = districtsData.map(d => `
+    <div class="district d-${d.status}" title="${d.val}%">
+      <div class="district-name">${d.name}</div>
+      <div class="district-val">${d.val}</div>
+    </div>
+  `).join('');
+  container.innerHTML = districtsGrid;
+}
+
+function renderForecast() {
+  const container = document.getElementById('forecastList');
+  if(!container) return;
+  const forecast = [
+    { time: "10:00", val: 84, class: "crit" }, { time: "11:00", val: 71, class: "warn" },
+    { time: "12:00", val: 63, class: "warn" }, { time: "13:00", val: 55, class: "ok" },
+    { time: "17:00", val: 89, class: "crit" }
+  ];
+  container.innerHTML = forecast.map(f => `
+    <div class="forecast-item">
+      <div class="forecast-time">${f.time}</div>
+      <div class="forecast-bar-wrap"><div class="forecast-bar bar-${f.class}" style="width:${f.val}%"></div></div>
+      <div class="forecast-val" style="color:var(--${f.class === 'crit' ? 'red' : (f.class === 'warn' ? 'amber' : 'green')})">${f.val}%</div>
+    </div>
+  `).join('');
+}
+
+function updateKPIs() {
+  const trafficDelta = (Math.random() * 6 - 3).toFixed(0);
+  realtimeData.traffic = Math.min(100, Math.max(40, realtimeData.traffic + parseInt(trafficDelta)));
+  realtimeData.jam = Math.max(30, realtimeData.jam + (Math.random() * 6 - 3));
+  realtimeData.speed = Math.min(50, Math.max(10, realtimeData.speed + (Math.random() * 2 - 1)));
+  realtimeData.incidents = Math.max(1, realtimeData.incidents + (Math.random() > 0.7 ? 1 : (Math.random() > 0.5 ? -1 : 0)));
+  realtimeData.aqi = Math.min(200, Math.max(80, realtimeData.aqi + (Math.random() * 10 - 5)));
+  realtimeData.pm = Math.min(120, Math.max(40, realtimeData.pm + (Math.random() * 8 - 4)));
+  realtimeData.co2 = Math.min(500, Math.max(400, realtimeData.co2 + (Math.random() * 10 - 5)));
+
+  const trafficEl = document.getElementById('kpiTraffic'); if(trafficEl) trafficEl.textContent = Math.round(realtimeData.traffic) + '%';
+  const jamEl = document.getElementById('kpiJam'); if(jamEl) jamEl.textContent = Math.round(realtimeData.jam);
+  const speedEl = document.getElementById('kpiSpeed'); if(speedEl) speedEl.innerHTML = Math.round(realtimeData.speed) + ' <span style="font-size:12px">км/ч</span>';
+  const incidentsEl = document.getElementById('kpiIncidents'); if(incidentsEl) incidentsEl.textContent = Math.round(realtimeData.incidents);
+  const aqiEl = document.getElementById('kpiAQI'); if(aqiEl) aqiEl.textContent = Math.round(realtimeData.aqi);
+  const pmEl = document.getElementById('kpiPM'); if(pmEl) pmEl.textContent = Math.round(realtimeData.pm);
+  const co2El = document.getElementById('kpiCO2'); if(co2El) co2El.textContent = Math.round(realtimeData.co2);
+}
+
+function updateCharts() {
+  const newTraffic = Math.round(40 + 35 * Math.sin((new Date().getHours() - 8) * Math.PI / 12) + Math.random() * 15);
+  if(window.trafficChartInstance) {
+    const newData = [...window.trafficChartData.slice(1), newTraffic];
+    window.trafficChartInstance.data.datasets[0].data = newData;
+    window.trafficChartInstance.update();
+  }
+}
+
+let refreshInterval = null;
+function startRealtime() {
+  if(refreshInterval) clearInterval(refreshInterval);
+  refreshInterval = setInterval(() => {
+    updateKPIs();
+    updateCharts();
+  }, 5000);
+}
+
+function switchPage(page, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('page-' + page).classList.add('active');
+}
+
+// === CHART INIT ===
+let trafficChartInstance, aqiChartInstance, pollChartInstance, trafficChart2Instance, districtChartInstance, aqiChart2Instance, pollChart2Instance, forecastChartInstance, forecastAQIInstance;
+let trafficChartData = [18,38,72,84,79,66,60,63,69,72,78,89,75];
+
+function initCharts() {
+  const ctx1 = document.getElementById('trafficChart')?.getContext('2d');
+  if(ctx1) trafficChartInstance = new Chart(ctx1, { type:'line', data:{ labels:['6','7','8','9','10','11','12','13','14','15','16','17','18'], datasets:[{ data:trafficChartData, borderColor:'#ff4d4d', backgroundColor:'rgba(255,77,77,0.08)', fill:true, tension:0.4, pointRadius:3, borderWidth:2 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#555b6e', font:{ size:10 } } }, y:{ grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#555b6e', callback:v=>v+'%' } } } } });
+  window.trafficChartInstance = trafficChartInstance;
+  window.trafficChartData = trafficChartData;
+
+  document.getElementById('aqiChart') && new Chart(document.getElementById('aqiChart'), { type:'line', data:{ labels:['Пн','Вт','Ср','Чт','Пт','Сб','Вс'], datasets:[{ data:[98,112,125,110,133,148,156], borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.08)', fill:true, tension:0.4, pointRadius:4, borderWidth:2 },{ data:[100,100,100,100,100,100,100], borderColor:'rgba(31,203,130,0.4)', borderDash:[6,4], borderWidth:1, pointRadius:0 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#555b6e' } }, y:{ grid:{ color:'rgba(255,255,255,0.06)' }, ticks:{ color:'#555b6e' } } } } });
+  document.getElementById('pollChart') && new Chart(document.getElementById('pollChart'), { type:'doughnut', data:{ labels:['Транспорт','Промышленность','ЖКХ','Прочее'], datasets:[{ data:[52,28,12,8], backgroundColor:['#ff4d4d','#f5a623','#4d9eff','#555b6e'], borderWidth:0 }] }, options:{ responsive:true, maintainAspectRatio:false, cutout:'65%', plugins:{ legend:{ display:true, position:'bottom', labels:{ color:'#8b90a0', font:{ size:9 } } } } } });
+  document.getElementById('trafficChart2') && new Chart(document.getElementById('trafficChart2'), { type:'bar', data:{ labels:['6','7','8','9','10','11','12','13','14','15','16','17','18','19','20'], datasets:[{ data:[18,38,72,84,79,66,60,63,69,72,78,89,75,55,35], backgroundColor:['rgba(255,77,77,0.7)','rgba(255,77,77,0.7)','rgba(255,77,77,0.7)','rgba(255,77,77,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(245,166,35,0.7)','rgba(31,203,130,0.7)','rgba(31,203,130,0.7)','rgba(31,203,130,0.7)'], borderRadius:4 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#555b6e', font:{ size:9 } } }, y:{ ticks:{ color:'#555b6e', callback:v=>v+'%' } } } } });
+  document.getElementById('districtChart') && new Chart(document.getElementById('districtChart'), { type:'bar', data:{ labels:['Алмалы','Медеу','Достык','Жетысу','Бостандык','Ауэзов','Турксиб','Алатау','Наурызбай'], datasets:[{ data:[84,80,82,77,72,68,66,52,45], backgroundColor:['#ff4d4d','#ff4d4d','#ff4d4d','#f5a623','#f5a623','#f5a623','#f5a623','#1fcb82','#1fcb82'], borderRadius:4 }] }, options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, scales:{ x:{ ticks:{ color:'#555b6e', callback:v=>v+'%' }, max:100 }, y:{ ticks:{ color:'#555b6e', font:{ size:9 } } } } } });
+  document.getElementById('aqiChart2') && new Chart(document.getElementById('aqiChart2'), { type:'line', data:{ labels:['1','2','3','4','5','6','7','8','9','10','11','12','13','14'], datasets:[{ label:'AQI', data:[88,92,105,98,115,108,112,125,110,133,140,148,152,156], borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.08)', fill:true, tension:0.4, pointRadius:3, borderWidth:2 },{ label:'Норма 100', data:Array(14).fill(100), borderColor:'rgba(31,203,130,0.4)', borderDash:[6,4], borderWidth:1, pointRadius:0 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ color:'#8b90a0', font:{ size:9 } } } }, scales:{ x:{ ticks:{ color:'#555b6e' } }, y:{ ticks:{ color:'#555b6e' } } } } });
+  document.getElementById('pollChart2') && new Chart(document.getElementById('pollChart2'), { type:'line', data:{ labels:['00','02','04','06','08','10','12','14','16','18','20','22'], datasets:[{ label:'PM2.5', data:[55,50,48,62,78,85,89,84,80,76,70,65], borderColor:'#ff4d4d', backgroundColor:'rgba(255,77,77,0.06)', fill:true, tension:0.4, pointRadius:2, borderWidth:2, yAxisID:'y' },{ label:'CO₂', data:[415,412,410,418,430,436,438,435,432,428,425,420], borderColor:'#4d9eff', backgroundColor:'rgba(77,158,255,0.06)', fill:false, tension:0.4, pointRadius:2, borderWidth:2, yAxisID:'y2' }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ color:'#8b90a0', font:{ size:9 } } } }, scales:{ x:{ ticks:{ color:'#555b6e' } }, y:{ ticks:{ color:'#555b6e' } }, y2:{ position:'right', ticks:{ color:'#555b6e' } } } } });
+  document.getElementById('forecastChart') && new Chart(document.getElementById('forecastChart'), { type:'line', data:{ labels:['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'], datasets:[{ label:'Прогноз', data:[84,71,63,55,60,68,75,89], borderColor:'#4d9eff', backgroundColor:'rgba(77,158,255,0.08)', fill:true, tension:0.4, pointRadius:4, borderWidth:2 },{ label:'Факт', data:[84,null,null,null,null,null,null,null], borderColor:'rgba(255,255,255,0.3)', pointRadius:4, borderWidth:1, borderDash:[4,4] }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ color:'#8b90a0', font:{ size:9 } } } }, scales:{ x:{ ticks:{ color:'#555b6e' } }, y:{ min:0, max:100, ticks:{ color:'#555b6e', callback:v=>v+'%' } } } } });
+  document.getElementById('forecastAQI') && new Chart(document.getElementById('forecastAQI'), { type:'line', data:{ labels:['10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00'], datasets:[{ label:'Прогноз AQI', data:[156,150,145,140,138,142,148,155], borderColor:'#f5a623', backgroundColor:'rgba(245,166,35,0.08)', fill:true, tension:0.4, pointRadius:4, borderWidth:2 },{ label:'Порог 100', data:Array(8).fill(100), borderColor:'rgba(31,203,130,0.4)', borderDash:[6,4], borderWidth:1, pointRadius:0 }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true, labels:{ color:'#8b90a0', font:{ size:9 } } } }, scales:{ x:{ ticks:{ color:'#555b6e' } }, y:{ ticks:{ color:'#555b6e' } } } } });
+}
+
+// === AI ANALYSIS ===
+async function runAI() {
+  const btn = document.getElementById('aiBtn');
+  const loading = document.getElementById('aiLoading');
+  const placeholder = document.getElementById('aiPlaceholder');
+  const body = document.getElementById('aiBody');
+  btn.disabled = true; btn.textContent = '⏳ Анализирую...';
+  placeholder.style.display = 'none'; body.style.display = 'none'; loading.classList.add('show');
+  setTimeout(() => {
+    document.getElementById('aiWhat').textContent = 'Город переживает одновременный двойной стресс: критическая перегрузка транспортной сети (84% загрузка + 3 активных инцидента) совпала с ухудшением качества воздуха (AQI 156, PM2.5 превышен в 3.5x). Ситуация развивалась с раннего утра — тренд AQI ухудшается 7 дней подряд.';
+    document.getElementById('aiCrit').textContent = 'ВЫСОКИЙ уровень критичности. AQI 156 опасен для пожилых, детей и людей с респираторными заболеваниями. Загрузка дорог 84% при 3 инцидентах создаёт риск полного паралича центра города в течение 30–60 минут.';
+    document.getElementById('aiAction').innerHTML = '• Немедленно направить аварийные службы на пр. Достык и ул. Фурманова<br>• Активировать альтернативные маршруты объезда: ул. Саина, пр. Абая, ул. Розыбакиева<br>• Увеличить частоту автобусов №12 и №45 на 40%<br>• Разослать уведомления населению: ограничить пребывание на улице';
+    loading.classList.remove('show'); body.style.display = 'block';
+    btn.disabled = false; btn.textContent = '↺ Обновить анализ';
+  }, 1500);
+}
+
+function speakInsight() {
+  const text = document.getElementById('aiWhat')?.innerText;
+  if(text && text !== '—') {
+    const utterance = new SpeechSynthesisUtterance(text + '. ' + (document.getElementById('aiCrit')?.innerText || ''));
+    utterance.lang = 'ru-RU';
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  } else {
+    runAI();
+    setTimeout(() => {
+      const t = document.getElementById('aiWhat')?.innerText;
+      if(t) { const u = new SpeechSynthesisUtterance(t); u.lang = 'ru-RU'; window.speechSynthesis.speak(u); }
+    }, 2000);
+  }
+}
+
+// === SETTINGS ===
+function toggleSettings(e) { e.stopPropagation(); const dd = document.getElementById('settingsDropdown'); dd.classList.toggle('open'); }
+function closeSettings() { document.getElementById('settingsDropdown').classList.remove('open'); }
+document.addEventListener('click', (e) => { const wrap = document.getElementById('settingsWrap'); if(wrap && !wrap.contains(e.target)) closeSettings(); });
+function setTheme(theme, btn) { document.querySelectorAll('.theme-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); document.body.classList.remove('theme-light'); if(theme === 'light') document.body.classList.add('theme-light'); closeSettings(); }
+function rerunDashboard() { location.reload(); }
+function exportReport() { html2canvas ? html2canvas(document.body).then(canvas=>{ const link=document.createElement('a'); link.download='dashboard.png'; link.href=canvas.toDataURL(); link.click(); }) : alert('Для экспорта нужна библиотека html2canvas'); }
+
+// === INIT ===
+renderAlerts(); renderDistricts(); renderForecast(); initCharts(); startRealtime();
+</script>
+</body>
+</html>
